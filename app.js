@@ -12,7 +12,11 @@ app.get("/", async (req, res) => {
   res.send({ message: "Hello World" });
 });
 
-
+app.post("/submit", async (req, res) => {
+  res.status(200);
+  res.send("Success");
+  console.log(req.body);
+});
 
 const PORT = process.env.PORT || 9000;
 
