@@ -4,10 +4,30 @@ const cors = require("cors");
 require("dotenv").config();
 const { MongoClient, ObjectId } = require("mongodb");
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const bodyParser = require("body-parser");
 
 //Middleware
 app.use(cors());
 app.use(express.json());
+app.use(bodyParser.json());
+
+const verifyToken = (req, res, next) => {
+    const token = req.headers.authorization; // Assuming token is sent in the Authorization header
+
+    if (!token) {
+        return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    jwt.verify(token, "your-secret-key", (err, decoded) => {
+        if (err) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
+
+        req.user = decoded; // Store user information in the request object for later use
+        next();
+    });
+};
 
 //Connect to DB
 async function connect() {
@@ -76,9 +96,14 @@ app.get("/customers/:id", async (req, res) => {
 //Register new customer
 app.post("/register", async (req, res) => {
     try {
-        const customer = req.body;
         //Connect to DB
         const db = await connect();
+
+        // Hash the password
+        const password = req.body.password;
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const customer = { ...req.body, password: hashedPassword };
+
         //Get current list of customers
         const currentCustomers = await db
             .collection("customers")
@@ -108,23 +133,76 @@ app.post("/register", async (req, res) => {
 //Login customer
 app.post("/login", async (req, res) => {
     try {
-        //Connect to DB
+        // Connect to DB
         const db = await connect();
-        //Extract body
-        const user = req.body;
-        console.log(user);
-        // Find the customer by email
-        const customer = await db.collection("customers").findOne(user);
-        console.log(customer);
+
+        // Find user by email
+        const { email, password } = req.body;
+        const user = await db.collection("customers").findOne({ email });
+
         // Check if the customer exists
-        if (!customer) {
+        if (!user) {
             return res.status(404).json({ error: "Customer not found" });
         }
 
-        // If everything is okay, you can return the customer data or a token for authentication
-        res.json(customer);
+        // Compare passwords
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+
+        if (!isPasswordValid) {
+            return res.status(401).json({ error: "Invalid email or password" });
+        }
+
+        // Generate JWT token
+        const token = jwt.sign({ customer: user }, "secret-key");
+
+        // If everything is okay, send back the user information and token
+        res.status(200).json({ user, token });
     } catch (error) {
         console.error(error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+//Create new budget
+app.post("/submit", async (req, res) => {
+    try {
+        // Connect to DB
+        const db = await connect();
+        const objectId = new ObjectId(req.body.customer);
+        // Find user by id
+        const user = await db
+            .collection("customers")
+            .findOne({ _id: objectId });
+
+        //Sum Income and outgoing
+        const incomeKeys = ["income", "otherIncome"];
+        const outgoingKeys = [
+            "mortgage",
+            "car",
+            "taxes",
+            "media",
+            "food",
+            "insurance",
+            "creditors",
+            "otherOutgoings"
+        ];
+        const totalIncome = incomeKeys.reduce((accumulator, key) => {
+            const value = +req.body[key] || 0;
+            return accumulator + value;
+        }, 0);
+        const totalOutgoings = outgoingKeys.reduce((accumulator, key) => {
+            const value = +req.body[key] || 0;
+            return accumulator + value;
+        }, 0);
+        delete req.body.customer;
+        const budget = {
+            ...req.body,
+            disposable: totalIncome - totalOutgoings
+        };
+        user.budgets = [...user.budgets, budget];
+        res.json(user);
+    } catch (error) {
+        console.log(error);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
