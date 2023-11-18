@@ -33,7 +33,7 @@ const verifyToken = (req, res, next) => {
 async function connect() {
     const client = new MongoClient("mongodb://127.0.0.1:27017", {
         useNewUrlParser: true,
-        useUnifiedTopology: true
+        useUnifiedTopology: true,
     });
 
     try {
@@ -111,7 +111,7 @@ app.post("/register", async (req, res) => {
             .toArray();
         //Check new customer is not already registered
         const isEmailRegistered = currentCustomers.some(
-            customer => customer.email === req.body.email
+            (customer) => customer.email === req.body.email
         );
 
         if (isEmailRegistered) {
@@ -164,15 +164,10 @@ app.post("/login", async (req, res) => {
 });
 
 //Create new budget
-app.post("/submit", async (req, res) => {
+app.post("/submit/:id", async (req, res) => {
     try {
         // Connect to DB
         const db = await connect();
-        const objectId = new ObjectId(req.body.customer);
-        // Find user by id
-        const user = await db
-            .collection("customers")
-            .findOne({ _id: objectId });
 
         //Sum Income and outgoing
         const incomeKeys = ["income", "otherIncome"];
@@ -184,7 +179,7 @@ app.post("/submit", async (req, res) => {
             "food",
             "insurance",
             "creditors",
-            "otherOutgoings"
+            "otherOutgoings",
         ];
         const totalIncome = incomeKeys.reduce((accumulator, key) => {
             const value = +req.body[key] || 0;
@@ -194,13 +189,27 @@ app.post("/submit", async (req, res) => {
             const value = +req.body[key] || 0;
             return accumulator + value;
         }, 0);
-        delete req.body.customer;
+
+        //Find and update user budgets
+
         const budget = {
+            id: new ObjectId(),
             ...req.body,
-            disposable: totalIncome - totalOutgoings
+            disposable: totalIncome - totalOutgoings,
         };
-        user.budgets = [...user.budgets, budget];
-        res.json(user);
+
+        const updatedUser = await db.collection("customers").findOneAndUpdate(
+            { _id: new ObjectId(req.params) }, // Match the user by _id field
+            { $push: { budgets: budget } }, // Push the new budget to the 'budgets' array
+            { returnOriginal: false } // Return the updated document
+        );
+
+        // Find the customer by ID
+        const customer = await db
+            .collection("customers")
+            .findOne({ _id: new ObjectId(req.params) });
+
+        res.json(customer); // Send the updated user as the response
     } catch (error) {
         console.log(error);
         res.status(500).json({ error: "Internal Server Error" });
