@@ -223,8 +223,32 @@ app.delete(`/delete/:userId/:budgetId`, async (req, res) => {
     try {
         // Connect to DB
         const db = await connect();
+        const customer = await db.collection("customers").findOne({
+            _id: new ObjectId(userId),
+        });
 
-       
+        if (!customer) {
+            return res.status(404).json({ message: "Customer not found" });
+        }
+
+        // Filter out the budget to be deleted
+        customer.budgets = customer.budgets.filter(
+            (budget) => budget.id.toString() !== budgetId
+        );
+
+        // Update the customer document with the modified budgets array
+        await db
+            .collection("customers")
+            .updateOne(
+                { _id: new ObjectId(userId) },
+                { $set: { budgets: customer.budgets } }
+            );
+
+        const updated = await db.collection("customers").findOne({
+            _id: new ObjectId(userId),
+        });
+
+        res.status(200).json(updated);
     } catch (error) {
         console.log(error);
         res.status(500).json({ error: "Internal Server Error" });
