@@ -6,6 +6,7 @@ const { MongoClient, ObjectId } = require("mongodb");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const bodyParser = require("body-parser");
+const { Cursor } = require("mongoose");
 
 //Middleware
 app.use(cors());
@@ -198,7 +199,7 @@ app.post("/submit/:id", async (req, res) => {
             disposable: totalIncome - totalOutgoings,
         };
 
-        const updatedUser = await db.collection("customers").findOneAndUpdate(
+        await db.collection("customers").findOneAndUpdate(
             { _id: new ObjectId(req.params) }, // Match the user by _id field
             { $push: { budgets: budget } }, // Push the new budget to the 'budgets' array
             { returnOriginal: false } // Return the updated document
@@ -210,6 +211,20 @@ app.post("/submit/:id", async (req, res) => {
             .findOne({ _id: new ObjectId(req.params) });
 
         res.json(customer); // Send the updated user as the response
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+//Delete a budget
+app.delete(`/delete/:userId/:budgetId`, async (req, res) => {
+    const { userId, budgetId } = req.params;
+    try {
+        // Connect to DB
+        const db = await connect();
+
+       
     } catch (error) {
         console.log(error);
         res.status(500).json({ error: "Internal Server Error" });
