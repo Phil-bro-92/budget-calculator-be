@@ -164,6 +164,16 @@ app.post("/login", async (req, res) => {
     }
 });
 
+//Update Customer details
+app.post('/update-details', async (req, res) => {
+    try {
+        //TODO: UPDATE DETAILS
+    } catch(error) {
+        console.error(error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+})
+
 //Create new budget
 app.post("/submit/:id", async (req, res) => {
     try {
