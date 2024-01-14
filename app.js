@@ -6,7 +6,7 @@ const { MongoClient, ObjectId } = require("mongodb");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const bodyParser = require("body-parser");
-const { Cursor } = require("mongoose");
+const Postal = require("@atech/postal");
 
 //Middleware
 app.use(cors());
@@ -32,10 +32,7 @@ const verifyToken = (req, res, next) => {
 
 //Connect to DB
 async function connect() {
-    const client = new MongoClient("mongodb://127.0.0.1:27017", {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-    });
+    const client = new MongoClient("mongodb://127.0.0.1:27017");
 
     try {
         await client.connect();
@@ -140,7 +137,7 @@ app.post("/login", async (req, res) => {
         // Find user by email
         const { email, password } = req.body;
         const user = await db.collection("customers").findOne({ email });
-
+        console.log(user);
         // Check if the customer exists
         if (!user) {
             return res.status(404).json({ error: "Customer not found" });
@@ -164,15 +161,85 @@ app.post("/login", async (req, res) => {
     }
 });
 
-//Update Customer details
-app.post('/update-details', async (req, res) => {
+//Password Reset
+app.post("/password_reset", async (req, res) => {
     try {
-        //TODO: UPDATE DETAILS
-    } catch(error) {
+        var client = new Postal.Client(
+            "https://postal.yourdomain.com",
+            "your-api-key"
+        );
+        var message = new Postal.SendMessage(client);
+
+        // Add some recipients
+        message.to(req.body.email);
+
+        // Specify who the message should be from - this must be from a verified domain
+        // on your mail server
+        message.from("test@test.postal.io");
+
+        // Set the subject
+        message.subject("Hi there!");
+
+        // Set the content for the e-mail
+        message.plainBody("Hello world!");
+        message.htmlBody("<p>Hello world!</p>");
+
+        // Add any custom headers
+        message.header("X-PHP-Test", "value");
+
+        // Attach any files
+        message.attach("textmessage.txt", "text/plain", "Hello world!");
+
+        // Send the message and get the result
+        message.send().then(function (result) {
+            var recipients = result.recipients();
+            // Loop through each of the recipients to get the message ID
+            for (var email in recipients) {
+                var message = recipients[email];
+                console.log(message.id()); // Logs the message ID
+                console.log(message.token()); // Logs the message's token
+            }
+        });
+    } catch {
         console.error(error);
         res.status(500).json({ error: "Internal Server Error" });
     }
-})
+});
+
+//Update Customer details
+app.post("/update-details", async (req, res) => {
+    try {
+        const updatedDetails = req.body; // Assuming request body contains updated details
+        const customerId = req.body.id;
+        console.log(customerId);
+        console.log(req.body);
+        // Connect to DB
+        const db = await connect();
+        const updatedCustomer = await db
+            .collection("customers")
+            .findOneAndUpdate(
+                { _id: new ObjectId(customerId) }, // Ensure _id is of type ObjectID
+                {
+                    $set: {
+                        first_name: updatedDetails.first_name,
+                        last_name: updatedDetails.last_name,
+                        email: updatedDetails.email,
+                        phone: updatedDetails.phone,
+                    },
+                },
+                { returnDocument: "after" } // 'after' to get the updated document
+            );
+        console.log(updatedCustomer);
+        if (!updatedCustomer) {
+            return res.status(404).json({ message: "Customer not found" });
+        }
+
+        res.json(updatedCustomer);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
 
 //Create new budget
 app.post("/submit/:id", async (req, res) => {

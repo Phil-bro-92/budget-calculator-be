@@ -2,6 +2,8 @@
 
 This project is a web-based budget calculator that allows users to register, log in, input budget details, view tables, and graphical representations of their budgets, as well as amend user details.
 
+link to frontend - https://github.com/Phil-bro-92/budget-calculator-fe
+
 ## Features
 
 -   **User Authentication:** Users can register and log in securely to access their budget details.
