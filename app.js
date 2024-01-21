@@ -6,7 +6,8 @@ const { MongoClient, ObjectId } = require("mongodb");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const bodyParser = require("body-parser");
-const Postal = require("@atech/postal");
+const nodemailer = require("nodemailer");
+const crypto = require("crypto");
 
 //Middleware
 app.use(cors());
@@ -156,51 +157,6 @@ app.post("/login", async (req, res) => {
         // If everything is okay, send back the user information and token
         res.status(200).json({ user, token });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-});
-
-//Password Reset
-app.post("/password_reset", async (req, res) => {
-    try {
-        var client = new Postal.Client(
-            "https://postal.yourdomain.com",
-            "your-api-key"
-        );
-        var message = new Postal.SendMessage(client);
-
-        // Add some recipients
-        message.to(req.body.email);
-
-        // Specify who the message should be from - this must be from a verified domain
-        // on your mail server
-        message.from("test@test.postal.io");
-
-        // Set the subject
-        message.subject("Hi there!");
-
-        // Set the content for the e-mail
-        message.plainBody("Hello world!");
-        message.htmlBody("<p>Hello world!</p>");
-
-        // Add any custom headers
-        message.header("X-PHP-Test", "value");
-
-        // Attach any files
-        message.attach("textmessage.txt", "text/plain", "Hello world!");
-
-        // Send the message and get the result
-        message.send().then(function (result) {
-            var recipients = result.recipients();
-            // Loop through each of the recipients to get the message ID
-            for (var email in recipients) {
-                var message = recipients[email];
-                console.log(message.id()); // Logs the message ID
-                console.log(message.token()); // Logs the message's token
-            }
-        });
-    } catch {
         console.error(error);
         res.status(500).json({ error: "Internal Server Error" });
     }
